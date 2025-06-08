@@ -8,8 +8,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - 5432:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data:rw
     networks:
@@ -22,8 +20,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-  tg_agent:
-    image: ubuntu
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: tg_agent
     restart: always
     environment:
@@ -31,11 +31,10 @@ services:
     volumes:
       - tg_agent_logs:/var/log/tg_agent/:rw
     networks:
-      postgres_network:
+      - postgres_network
     depends_on:
       postgres:
         condition: service_healthy
-        restart: true
 networks:
   postgres_network:
     driver: bridge
@@ -47,4 +46,3 @@ volumes:
   static:
     external: true
     name: frontend_static
-
