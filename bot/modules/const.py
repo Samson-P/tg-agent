@@ -10,15 +10,29 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "send_email",
-            "description": "Отправить письмо по email",
+            "description": "Отправляет письмо",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "to_email": {"type": "string", "description": "Email адрес получателя"},
+                    "to_email": {"type": "string", "description": "Email получателя"},
                     "subject": {"type": "string", "description": "Тема письма"},
-                    "body": {"type": "string", "description": "Текст письма"}
+                    "body": {"type": "string", "description": "Тело письма"}
                 },
                 "required": ["to_email", "subject", "body"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_message",
+            "description": "Отправляет текстовое сообщение пользователю",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Ответ пользователю"}
+                },
+                "required": ["text"]
             }
         }
     }

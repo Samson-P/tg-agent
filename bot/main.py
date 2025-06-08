@@ -12,10 +12,7 @@ from dotenv import load_dotenv
 import re
 from modules.const import SYSTEM_PROMPT, TOOLS
 
-
-# Подключаем nest_asyncio, чтобы не было ошибки "event loop already running"
 nest_asyncio.apply()
-
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -38,10 +35,24 @@ async def tool_send_email(to_email: str, subject: str, body: str) -> str:
     return f"Письмо отправлено на {to_email}."
 
 
+async def tool_send_message(text: str) -> str:
+    return text
+
+
 TOOL_FUNCTIONS = {
-    "send_email": tool_send_email
+    "send_email": tool_send_email,
+    "send_message": tool_send_message
 }
 
+
+def detect_tool(prompt: str) -> str:
+    if "отправь письмо" in prompt.lower() or "email" in prompt.lower():
+        return "send_email"
+    return "send_message"
+
+
+import asyncio
+import re
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != TELEGRAM_MAIN_CHAT_ID:
@@ -50,6 +61,45 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     prompt = update.message.text.strip()
 
+    # Обработка команды сохранения контакта
+    contact_match = re.match(r"запомни контакт:\s*(.+)", prompt, re.IGNORECASE)
+    if contact_match:
+        contact_text = contact_match.group(1)
+        # Пример парсинга: "Иван Иванов, тел 123456789, email ivan@example.com"
+        name_match = re.search(r"^([^,]+)", contact_text)
+        phone_match = re.search(r"тел\s*([\d+]+)", contact_text, re.IGNORECASE)
+        email_match = re.search(r"email\s*([\w.@+-]+)", contact_text, re.IGNORECASE)
+
+        name = name_match.group(1).strip() if name_match else None
+        phone = phone_match.group(1).strip() if phone_match else None
+        email = email_match.group(1).strip() if email_match else None
+
+        if name:
+            await save_contact(user_id, name, phone, email)
+            reply = f"Контакт '{name}' сохранён."
+        else:
+            reply = "Не удалось распознать имя контакта. Формат: 'запомни контакт: Имя, тел 12345, email example@example.com'"
+        await update.message.reply_text(reply)
+        return
+
+    # Обработка команды вывода контактов
+    if prompt.lower() in ["напиши все контакты, которые запомнил", "все контакты"]:
+        contacts = await get_contacts(user_id)
+        if not contacts:
+            await update.message.reply_text("У меня нет запомненных контактов.")
+        else:
+            lines = []
+            for c in contacts:
+                line = c[0]
+                if c[1]:
+                    line += f", тел: {c[1]}"
+                if c[2]:
+                    line += f", email: {c[2]}"
+                lines.append(line)
+            await update.message.reply_text("\n".join(lines))
+        return
+
+    # Сохраняем пользовательское сообщение
     await save_message(user_id, "user", prompt)
 
     history = [
@@ -58,12 +108,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {"role": "user", "content": prompt}
     ]
 
+    tool_name = detect_tool(prompt)
+
     try:
         response = openai.ChatCompletion.create(
             model=MODEL,
             messages=history,
             tools=TOOLS,
-            tool_choice={"type": "function", "function": {"name": "send_email"}}
+            tool_choice={"type": "function", "function": {"name": tool_name}}
         )
 
         message = response.choices[0].message
@@ -80,8 +132,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     await update.message.reply_text(f"Неизвестная функция: {func_name}")
         else:
-            reply = message.get("content", "")
-            reply = strip_think_blocks(reply)
+            reply = strip_think_blocks(message.get("content", ""))
             await save_message(user_id, "assistant", reply)
             await update.message.reply_text(reply)
 

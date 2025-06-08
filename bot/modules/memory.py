@@ -31,6 +31,16 @@ async def init_db():
             timestamp TIMESTAMPTZ DEFAULT NOW()
         )
         """)
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS contacts (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            name TEXT NOT NULL,
+            phone TEXT,
+            email TEXT,
+            UNIQUE(user_id, name)
+        )
+        """)
 
 async def save_message(user_id, role, message):
     async with DB_POOL.acquire() as conn:
@@ -46,4 +56,23 @@ async def get_recent_messages(user_id, limit=10):
             user_id, limit
         )
         return [{"role": row["role"], "content": row["message"]} for row in reversed(rows)]
+
+
+# Новые функции для контактов
+
+async def save_contact(user_id: int, name: str, phone: str = None, email: str = None):
+    async with DB_POOL.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO contacts (user_id, name, phone, email)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, name) DO UPDATE SET phone = EXCLUDED.phone, email = EXCLUDED.email
+        """, user_id, name, phone, email)
+
+async def get_contacts(user_id: int):
+    async with DB_POOL.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT name, phone, email FROM contacts WHERE user_id = $1 ORDER BY name",
+            user_id
+        )
+        return rows
 

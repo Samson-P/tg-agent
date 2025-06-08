@@ -4,6 +4,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
+EMAIL_TEMPLATE = """\
+Привет!
+{message_body}
+
+С уважением,
+Виртуальный помощник Самсона,
+Генри
+"""
+
+
 def send_email(to_email: str, subject: str, body: str):
     load_dotenv()
 
@@ -12,11 +22,13 @@ def send_email(to_email: str, subject: str, body: str):
     smtp_user = os.getenv("SMTP_USER")
     smtp_password = os.getenv("SMTP_PASSWORD")
 
+    full_body = EMAIL_TEMPLATE.format(message_body=body)
+
     msg = MIMEMultipart()
     msg["From"] = smtp_user
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    msg.attach(MIMEText(full_body, "plain"))
 
     with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
         server.login(smtp_user, smtp_password)
