@@ -54,6 +54,7 @@ def detect_tool(prompt: str) -> str:
 import asyncio
 import re
 
+# TODO: add langchain for tool calling
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != TELEGRAM_MAIN_CHAT_ID:
         return
